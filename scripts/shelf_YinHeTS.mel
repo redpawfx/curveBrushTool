@@ -1,0 +1,15 @@
+global proc shelf_YinHeTS () {
+    global string $gBuffStr;
+    global string $gBuffStr0;
+    global string $gBuffStr1;
+    
+    shelfButton
+		-label "curveBrush"
+		-image1 "curveBrushTool.xpm"
+		-command curveBrushTool
+		-doubleClickCommand curveBrushToolOptions;
+    //initial curveBrushToolCommands
+    curveBrushRunTimeCommands();
+
+
+}

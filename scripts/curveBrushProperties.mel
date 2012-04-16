@@ -1,0 +1,75 @@
+
+
+global proc curveBrushProperties ()
+
+{
+	setUITemplate -pushTemplate DefaultTemplate;
+
+	string $parent = `toolPropertyWindow -q -location`;
+       setParent $parent;
+	string $curctx = `currentCtx`;
+
+	columnLayout curveBrush;
+		tabLayout -childResizable true curveBrushTabs;
+			columnLayout curveBrushTab;
+				frameLayout -cll true -cl false -l "curveBrush Options" curveBrushFrame;
+					columnLayout curveBrushOptions;
+						separator -style "none";
+
+						intSliderGrp
+							-field 1
+							-label "Brush Size"
+							-minValue 10
+							-maxValue 400
+							-fieldMinValue 10 
+                                                -fieldMaxValue 400
+							-value 100
+							radius;
+                                         floatSliderGrp
+							-field 1
+							-label "Brush Intensity"
+							-minValue 0.0
+							-maxValue 2.0
+							-fieldMinValue 0.0 
+                                                -fieldMaxValue 2.0
+							-value 0.5
+							intensity;
+						checkBoxGrp
+							-label "LockBase"
+							-numberOfCheckBoxes 1
+							-l1 " "
+							lockBaseGrp;
+
+
+					setParent ..; // curveBrushOptions
+				setParent ..; // curveBrushFrame
+			setParent ..; // curveBrushTab
+		setParent ..; //  curveBrushTabs
+	setParent ..; // curveBrush
+
+	// Name the tabs; -tl does not allow tab labelling upon creation
+	tabLayout -e -tl curveBrushTab "Tool Defaults" curveBrushTabs;
+
+	setUITemplate -popTemplate;
+
+	curveBrushSetCallbacks($parent);
+}
+
+
+global proc curveBrushSetCallbacks(string $parent)
+
+{
+	setParent	$parent;
+	string		$whichCtx = `currentCtx`;
+
+ 	intSliderGrp -e
+ 		-cc ("curveBrushContext -e -r #1 `currentCtx`")
+ 		radius;
+       floatSliderGrp -e
+             -cc ("curveBrushContext -e -ity #1 `currentCtx`")
+             intensity;
+ 	checkBoxGrp -e
+ 		-on1 ("curveBrushContext -e -lb true `currentCtx`")
+ 		-of1 ("curveBrushContext -e -lb false `currentCtx`")
+ 		lockBaseGrp;	
+}

@@ -1,0 +1,23 @@
+
+
+proc registerCommand(string $commandName, string $ann, string $cmd)
+{
+	if (`runTimeCommand -exists $commandName`)
+		runTimeCommand -e -cat "curveBrush" -c $cmd -ann $ann $commandName;
+	else
+		runTimeCommand -cat "curveBrush" -c $cmd -ann $ann $commandName;
+}
+
+global proc curveBrushRunTimeCommands()
+{
+   registerCommand(
+		"curveBrushToolOptions",
+		"curveBrush: curve Brush Tool options",
+		"curveBrushToolIni true"
+	           );
+   registerCommand(
+		"curveBrushTool",
+		"curveBrushTool:paint selected curves",
+		"curveBrushToolIni false"
+	           );
+}

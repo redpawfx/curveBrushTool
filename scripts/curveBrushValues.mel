@@ -1,0 +1,43 @@
+
+//curveBrushContext will call it
+
+
+global proc curveBrushOptionValues(string $toolName)
+{
+	int $set;
+
+ 	$set = eval("curveBrushContext -q -r " + $toolName);
+ 	intSliderGrp -e -value $set radius;
+ 	
+       float $inten;
+       $inten = eval("curveBrushContext -q -ity " + $toolName);
+       floatSliderGrp -e -value $inten intensity;
+
+ 	$set = eval("curveBrushContext -q -lb " + $toolName);
+ 	if ($set) {
+ 		checkBoxGrp -e -value1 1 lockBaseGrp;
+ 	}
+ 	else {
+ 		checkBoxGrp -e -value1 0 lockBaseGrp;
+ 	}
+	
+}
+
+
+global proc curveBrushValues(string $toolName) 
+{
+	string $parent = 
+		(`toolPropertyWindow -q -location` + "|curveBrush|curveBrushTabs|curveBrushTab");
+	setParent $parent;
+
+	string $icon = "curveBrushTool.xpm";
+       string $address=`internalVar -userScriptDir`;
+	string $help = "-a \""+ $address+"curveBrushTool_help/curveBrush_help.htm\"";
+	toolPropertySetCommon $toolName $icon $help;
+
+	frameLayout -e -en true -cl false curveBrushFrame;
+	curveBrushOptionValues($toolName);
+
+	toolPropertySelect curveBrush;
+}
+

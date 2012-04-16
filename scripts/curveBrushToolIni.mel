@@ -1,0 +1,11 @@
+
+global proc curveBrushToolIni(int $showPropertySheet)
+{
+	string	$tool = "curveBrushContext";
+
+	if (!`curveBrushContext -exists $tool`) curveBrushContext $tool;
+
+	setToolTo $tool;
+
+	if ($showPropertySheet) toolPropertyWindow;
+}
