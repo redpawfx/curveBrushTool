@@ -21,10 +21,14 @@
 #include <maya/MVectorArray.h>
 #include <maya/MFnDagNode.h>
 
-//#include <WindowsX.h>
-//#include <windows.h>
-#include <GL/glu.h>
-#include <GL/glx.h>
+#ifdef WIN32
+	#include <WindowsX.h>
+	#include <windows.h>
+	#include <gl/GLU.h>
+#else
+	#include <GL/glu.h>
+	#include <GL/glx.h>
+#endif
 #include <stdlib.h>
 #include <math.h>
 //#include <vector>
