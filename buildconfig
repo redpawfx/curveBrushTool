@@ -1,0 +1,40 @@
+#//////////////////////////////////////////////////////////////////////////////////
+#//// GENERIC  maya plugin make file buildConfig 
+#///////////////////////////////////////////////////
+#
+#////////
+#/// version 1.0
+#/// author : johnc
+#//\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+
+CC			= gcc
+C++			= g++
+
+# When the following line is present, the linking of plugins will
+# occur much faster.  If you link transitively (the default) then
+# a number of "ld Warning 85" messages will be printed by ld.
+# They are expected, and can be safely ignored.
+NO_TRANS_LINK = 
+
+CFLAGS	= -DBits64_ -m64 -DUNIX -D_BOOL -DLINUX -DFUNCPROTO -D_GNU_SOURCE -DLINUX_64 -DPARALLEL=1 -fPIC \
+		-fno-strict-aliasing -DREQUIRE_IOSTREAM -Wno-deprecated -O3 -Wall -Wno-unused \
+		-Wno-multichar -Wno-comment -Wno-sign-compare -funsigned-char \
+		-Wno-reorder -fno-gnu-keywords -ftemplate-depth-25 -pthread  
+
+C++FLAGS	= $(CFLAGS) $(WARNFLAGS) -Wno-deprecated -fno-gnu-keywords 
+
+INCLUDES	= -I. -I.. -I$(MAYA_LOCATION)/include -I/usr/X11R6/include -I/usr/include  -I/usr/include/CC  -I./src
+
+# -Bsymbolic binds references to global symbols within the library.
+# This avoids symbol clashes in other shared libraries but forces
+# the linking of all required libraries.
+
+LD			= $(C++) $(NO_TRANS_LINK) $(C++FLAGS) -Wl,-Bsymbolic -shared
+
+LIBS		= -L$(MAYA_LOCATION)/lib  -lOpenMaya -lFoundation -lOpenMayaFX -lOpenMayaAnim -lOpenMayaRender 
+LIBS_GL_EXTRA = -lGL -lGLU
+
+EXT	= so
+
+
