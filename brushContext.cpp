@@ -14,12 +14,12 @@ brushContext::brushContext()
     Radius=100.0;
     intensitySwitch=false;
     intensity=1.0;
-    MVector zero = MVector::zero;
-    cvsInCircle=MVectorArray(0,zero );
+    cvsInCircle.clear();
 
     MString str("Curve Brush Manipulator");
     setTitleString(str);
     setImage("curveBrushTool.xpm",kImage1);
+	firstDraw = false;
 }
 
 void    brushContext::toolOnSetup(MEvent &newEvent)
@@ -85,10 +85,9 @@ MStatus brushContext::doPress(MEvent &newEvent)
 
     if (MPxContext::doPress(newEvent) == MS::kSuccess)
     {
-        if (newEvent.getPosition(cursorX,cursorY) == MS::kSuccess)
+		firstDraw = true;
+		if (newEvent.getPosition(cursorX,cursorY) == MS::kSuccess)
 		{
-
-			cout << cursorX << " " <<  cursorY << endl;
             updateGuidLine();
             //record the press position
             oldCursorX=cursorX;
@@ -120,7 +119,7 @@ MStatus brushContext::doRelease(MEvent &newEvent)
 
     MCursor backCursor(MCursor::doubleCrossHairCursor);
     setCursor(backCursor);
-
+	updateGuidLine();
 
     MString command = "undoInfo -closeChunk";
     MGlobal::executeCommand(command);
@@ -131,8 +130,7 @@ MStatus brushContext::doHold(MEvent &newEvent)
     if (MPxContext::doHold(newEvent) == MS::kSuccess)
     {
         if (newEvent.getPosition(cursorX,cursorY) == MS::kSuccess)
-        {
-            updateGuidLine();
+		{
             return MS::kSuccess;
         }
         else
@@ -146,7 +144,15 @@ MStatus brushContext::doDrag(MEvent &newEvent)
 {
     if (MPxContext::doDrag(newEvent) == MS::kSuccess)
     {
-		cout << "drag" << endl;
+		if (!firstDraw)
+		{
+			//	Clear the guide from the old position.
+			updateGuidLine();
+		}
+		else
+		{
+			firstDraw = false;
+		}
         if (newEvent.getPosition(cursorX,cursorY) == MS::kSuccess)
         {
             if (!newEvent.isModifierShift() && (!newEvent.isModifierControl()) )
@@ -199,7 +205,6 @@ void    brushContext::updateGuidLine()
     int portW=view.portWidth();
     int portH=view.portHeight();
 
-
     view.beginXorDrawing();
     glClear(GL_CURRENT_BIT);
     glMatrixMode(GL_PROJECTION);
@@ -209,7 +214,7 @@ void    brushContext::updateGuidLine()
     glLoadIdentity();
 
     glPushAttrib(GL_CURRENT_BIT );
-    glColor3f(1,0,0);
+    glColor3f(0,1,1);
     glLineWidth(1.5);
     glBegin(GL_LINE_LOOP);
     for (int i=0; i<360; i++)
@@ -235,21 +240,18 @@ void    brushContext::updateGuidLine()
     glFlush();
     glPopAttrib();
 
+	/*
 #ifdef _WIN32
     SwapBuffers( view.deviceContext() );
 #elif defined (OSMac_)
     ::aglSwapBuffers( view.display());
 #else
-//	glXSwapBuffers( view.display(), view.window() );
+	glXSwapBuffers( view.display(), view.window() );
 #endif // _WIN32
-
-    //view.refresh();
+*/
     view.endXorDrawing();
-
     view.refresh(0,1,0);
 }
-
-
 
 //get selected curves and store them in curvePathArray
 MStatus brushContext::getSelectedCurves(MDagPathArray &curvePathArray)
@@ -278,32 +280,33 @@ MStatus brushContext::getSelectedCurves(MDagPathArray &curvePathArray)
         return MS::kFailure;
 }
 
-MStatus brushContext::updateCurve(MDagPathArray curvePathArray,MVectorArray cvLib)
+MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned int, MIntArray>cvLib)
 {
-    unsigned int i=0;
+
     MStatus    state=MS::kSuccess;
 
     if (curvePathArray.length() == 0)
         return MS::kFailure;
 
-    for (;i<cvLib.length();i++)
-    {
-        //vectorArray cvlib containts the proper curve and its pt
-        //x is the specific curve and y is the cv num
-        MFnNurbsCurve brushCurve(curvePathArray[(int)cvLib[i].x],&state);
-        if ( state == MS::kFailure )
-            return state;
+	map<unsigned int, MIntArray>::iterator  iter;
+	for (iter = cvLib.begin(); iter != cvLib.end(); iter++)
+	{
+		MFnNurbsCurve brushCurve(curvePathArray[iter->first],&state);
+		if ( state == MS::kFailure )
+			return state;
+		unsigned int j = 0;
+		for (;j<iter->second.length();j++)
+		{
+			MString curveName = curvePathArray[iter->first].fullPathName();
 
-        MString curveName = curvePathArray[(int)cvLib[i].x].fullPathName();
-
-        state=updatePosition(curveName,brushCurve,(int)cvLib[i].y);
-        if (state == MS::kFailure)
-            return state;
-
-        state=brushCurve.updateCurve();
-        if (state == MS::kFailure)
-            return state;
-    }
+			state=updatePosition(curveName,brushCurve,iter->second[j]);
+			if (state == MS::kFailure)
+				return state;
+		}
+		state=brushCurve.updateCurve();
+		if (state == MS::kFailure)
+			return state;
+	}
 
     return state;
 }
@@ -351,23 +354,24 @@ MStatus brushContext::updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, 
 
     pt+=intensity*mag*dir3d;
 
-    MString command = "move -a ";
-    command = command +pt[0] + " " + pt[1]+" " +pt[2]+ " " +curveName+".cv["+cvNum+"]" ;
-
-    MGlobal::executeCommand(command,0,1);
-
+	state=ptsCurve.setCV(cvNum,pt,MSpace::kWorld);
 
     return state;
 }
 
 //check which cv is in circle
-MStatus brushContext::checkCv(MDagPathArray PathArray,MVectorArray &cvInCircle)
+MStatus brushContext::checkCv(MDagPathArray PathArray,std::map<unsigned int,MIntArray> &cvsInCircle)
 {
     unsigned int i=0;
     MStatus      state=MS::kSuccess;
 
+	cvsInCircle.clear();
+
     for (;i<PathArray.length();i++)
     {
+		MIntArray perCurve;
+		cvsInCircle.insert(pair<unsigned int, MIntArray> (i,perCurve));
+
         MFnNurbsCurve nurbsCurve(PathArray[i],&state);
 
         MFnDagNode dagNode(PathArray[i]);
@@ -386,6 +390,7 @@ MStatus brushContext::checkCv(MDagPathArray PathArray,MVectorArray &cvInCircle)
             j=0;
         else
             j=1;
+
         for (;j<pts.length();j++)
         {
             short int xPos=0,yPos=0;
@@ -399,8 +404,7 @@ MStatus brushContext::checkCv(MDagPathArray PathArray,MVectorArray &cvInCircle)
             float distanceToCursor=sqrt( (float) (xPos-oldCursorX)*(xPos-oldCursorX)+(yPos-oldCursorY)*(yPos-oldCursorY) );
             if ( distanceToCursor < Radius )
             {
-                MVector cv(i,j,0);
-                state=cvInCircle.append(cv);
+                state=cvsInCircle[i].append(j);
                 if ( state == MS::kFailure )
                     return state;
             }

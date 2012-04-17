@@ -26,6 +26,9 @@
 	#include <WindowsX.h>
 	#include <windows.h>
 	#include <gl/GLU.h>
+#elseif defined(OSMac_MachO_)
+	#include <OpenGL/gl.h>
+	#include <OpenGL/glu.h>
 #else
 	#include <GL/glu.h>
 	#include <GL/glx.h>
@@ -34,7 +37,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
-//#include <vector>
+#include <map>
 
 class brushContext : public MPxContext
 {
@@ -58,7 +61,6 @@ protected:
 private:
     M3dView         view;
     MDagPathArray   dagPathArray;
-    /*std::vector <MPointArray> curveCVPos;*/
     float           PI;
     bool            lockBase;
     bool            interactiveResize;
@@ -66,13 +68,14 @@ private:
     float           Radius;
     bool            intensitySwitch;
     double          intensity;
-    MVectorArray    cvsInCircle;
+    bool			firstDraw;
+	std::map<unsigned int, MIntArray> cvsInCircle;
 
 public:
     void            updateGuidLine(void);
     MStatus         getSelectedCurves(MDagPathArray &curvePathArray);
-    MStatus         checkCv(MDagPathArray PathArray,MVectorArray &cvInCircle);
-    MStatus         updateCurve(MDagPathArray curvePathArray,MVectorArray cvLib);
+    MStatus         checkCv(MDagPathArray PathArray,std::map<unsigned int,MIntArray> &cvLib );
+    MStatus         updateCurve(MDagPathArray curvePathArray,std::map<unsigned int,MIntArray> cvLib);
     MStatus         updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, int cvNum );
     MStatus         storePosition();
     MStatus         restorePosition();
