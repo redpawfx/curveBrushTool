@@ -4,7 +4,6 @@
 
 #////////
 #/// version 1.0
-#/// author : johnc
 #\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 #
@@ -29,7 +28,7 @@ depend:
 	makedepend $(INCLUDES) *.cc *.cpp
 
 clean:
-	-rm -f ./src/*.o  $(OUTPUT)*.so
+	-rm -f *.o  $(OUTPUT)*.so
 
 
 ##################
