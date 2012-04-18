@@ -76,7 +76,7 @@ public:
     MStatus         getSelectedCurves(MDagPathArray &curvePathArray);
     MStatus         checkCv(MDagPathArray PathArray,std::map<unsigned int,MIntArray> &cvLib );
     MStatus         updateCurve(MDagPathArray curvePathArray,std::map<unsigned int,MIntArray> cvLib);
-    MStatus         updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, int cvNum );
+    MStatus         updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, int cvNum, double mag, MVector dir3d );
     MStatus         storePosition();
     MStatus         restorePosition();
 

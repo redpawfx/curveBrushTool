@@ -129,6 +129,7 @@ MStatus brushContext::doHold(MEvent &newEvent)
 {
     if (MPxContext::doHold(newEvent) == MS::kSuccess)
     {
+
         if (newEvent.getPosition(cursorX,cursorY) == MS::kSuccess)
 		{
             return MS::kSuccess;
@@ -207,14 +208,8 @@ void    brushContext::updateGuidLine()
 
     view.beginXorDrawing();
     glClear(GL_CURRENT_BIT);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0,portW,0,portH);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
     glPushAttrib(GL_CURRENT_BIT );
-    glColor3f(0,1,1);
+	glColor3f(0,1,1);
     glLineWidth(1.5);
     glBegin(GL_LINE_LOOP);
     for (int i=0; i<360; i++)
@@ -234,11 +229,12 @@ void    brushContext::updateGuidLine()
     glBegin(GL_LINES);
     glVertex2f( cursorX , (cursorY)-Radius*(float)intensity );
     glVertex2f( cursorX , (cursorY)+Radius*(float)intensity );
+
     glEnd();
 
-
-    glFlush();
-    glPopAttrib();
+    //glFlush();
+	glLineWidth(1.0);
+	glPopAttrib();
 
 	/*
 #ifdef _WIN32
@@ -288,41 +284,8 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
     if (curvePathArray.length() == 0)
         return MS::kFailure;
 
-	map<unsigned int, MIntArray>::iterator  iter;
-	for (iter = cvLib.begin(); iter != cvLib.end(); iter++)
-	{
-		MFnNurbsCurve brushCurve(curvePathArray[iter->first],&state);
-		if ( state == MS::kFailure )
-			return state;
-		unsigned int j = 0;
-		for (;j<iter->second.length();j++)
-		{
-			MString curveName = curvePathArray[iter->first].fullPathName();
-
-			state=updatePosition(curveName,brushCurve,iter->second[j]);
-			if (state == MS::kFailure)
-				return state;
-		}
-		state=brushCurve.updateCurve();
-		if (state == MS::kFailure)
-			return state;
-	}
-
-    return state;
-}
-
-//get the single curve and its single cv then move it
-MStatus brushContext::updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, int cvNum )
-{
-    MStatus      state=MS::kSuccess;
-    MPoint       pt;
-
-    //get the position of cvNum and put it into pt
-    state=ptsCurve.getCV(cvNum,pt,MSpace::kWorld);
-    if (state == MS::kFailure)
-        return state;
-
-    MPoint nearClipPt[2],farClipPt[2];
+	// calculate the motion of the cursor once out here.. 
+	MPoint nearClipPt[2],farClipPt[2];
 
     //get the oldCursor position on the near clip of the camera
     state=view.viewToWorld(oldCursorX,(oldCursorY),nearClipPt[0],farClipPt[0]);
@@ -352,7 +315,41 @@ MStatus brushContext::updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, 
     dirNearPt=maxNearViewPoint[1]-maxNearViewPoint[0];
     double mag=dirNearPt.length();
 
-    pt+=intensity*mag*dir3d;
+	map<unsigned int, MIntArray>::iterator  iter;
+	for (iter = cvLib.begin(); iter != cvLib.end(); iter++)
+	{
+		MFnNurbsCurve brushCurve(curvePathArray[iter->first],&state);
+		if ( state == MS::kFailure )
+			return state;
+		unsigned int j = 0;
+		for (;j<iter->second.length();j++)
+		{
+			MString curveName = curvePathArray[iter->first].fullPathName();
+
+			state=updatePosition(curveName,brushCurve,iter->second[j], mag, dir3d);
+			if (state == MS::kFailure)
+				return state;
+		}
+		state=brushCurve.updateCurve();
+		if (state == MS::kFailure)
+			return state;
+	}
+
+    return state;
+}
+
+//get the single curve and its single cv then move it
+MStatus brushContext::updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, int cvNum, double mag, MVector dir3d )
+{
+    MStatus      state=MS::kSuccess;
+    MPoint       pt;
+
+    //get the position of cvNum and put it into pt
+    state=ptsCurve.getCV(cvNum,pt,MSpace::kWorld);
+    if (state == MS::kFailure)
+        return state;
+
+	pt+=intensity*mag*dir3d;
 
 	state=ptsCurve.setCV(cvNum,pt,MSpace::kWorld);
 
