@@ -15,6 +15,7 @@
 #include <maya/MColor.h>
 #include <maya/MItSelectionList.h>
 #include <maya/MFnNurbsCurve.h>
+#include <maya/MFnCamera.h>
 #include <maya/MPoint.h>
 #include <maya/MPointArray.h>
 #include <maya/MVector.h>
@@ -55,8 +56,6 @@ public:
     void            abortAction ( );
     void			deleteAction();
 
-protected:
-    MStatus         setCursor(const MCursor &cursor);
 
 private:
     M3dView         view;

@@ -11,15 +11,16 @@ brushContext::brushContext()
     interactiveResize=false;
     lockBase=true;
     cursorX=oldCursorX=0.0,cursorY=oldCursorY=0.0;
-    Radius=100.0;
+    Radius=50.0;
     intensitySwitch=false;
-    intensity=1.0;
+    intensity=0.5;
     cvsInCircle.clear();
 
     MString str("Curve Brush Manipulator");
     setTitleString(str);
     setImage("curveBrushTool.xpm",kImage1);
 	firstDraw = false;
+	setCursor(MCursor::pencilCursor); // set the default cursor
 }
 
 void    brushContext::toolOnSetup(MEvent &newEvent)
@@ -32,8 +33,7 @@ void    brushContext::toolOnSetup(MEvent &newEvent)
     {
         dagPathArray.clear();
 
-        MCursor crossHairCursor(MCursor::doubleCrossHairCursor);
-        setCursor(crossHairCursor);
+        setCursor(MCursor::pencilCursor);
         if (getSelectedCurves(dagPathArray) == MS::kSuccess && dagPathArray.length() > 0)
         {
             MGlobal::executeCommand("LockCurveLength",0,0);
@@ -59,11 +59,13 @@ void    brushContext::toolOnSetup(MEvent &newEvent)
 
 void    brushContext::toolOffCleanup()
 {
+	// keep here for post tool cleanup
     MPxContext::toolOffCleanup();
 }
 
 MStatus brushContext::doEnterRegion ( MEvent &newEvent)
 {
+	cout<< "doEnterRegion" << endl;
     if (MPxContext::doEnterRegion(newEvent) == MS::kSuccess)
     {
         MString str("Drag the tool around the curves");
@@ -106,19 +108,13 @@ MStatus brushContext::doPress(MEvent &newEvent)
     else
         return MS::kFailure;
 }
-MStatus brushContext::setCursor(const MCursor &cursor)
-{
-    if (MPxContext::setCursor(cursor) == MS::kSuccess)
-        return MStatus::kSuccess;
-    return MS::kFailure;
-}
+
 
 MStatus brushContext::doRelease(MEvent &newEvent)
 {
     MStatus state=MPxContext::doRelease(newEvent);
 
-    MCursor backCursor(MCursor::doubleCrossHairCursor);
-    setCursor(backCursor);
+    setCursor(MCursor::pencilCursor);
 	updateGuidLine();
 
     MString command = "undoInfo -closeChunk";
@@ -129,7 +125,6 @@ MStatus brushContext::doHold(MEvent &newEvent)
 {
     if (MPxContext::doHold(newEvent) == MS::kSuccess)
     {
-
         if (newEvent.getPosition(cursorX,cursorY) == MS::kSuccess)
 		{
             return MS::kSuccess;
@@ -170,16 +165,14 @@ MStatus brushContext::doDrag(MEvent &newEvent)
             {
                 interactiveResize=true;
                 intensitySwitch=false;
-                MCursor resizeCursor(MCursor::crossHairCursor);
-                setCursor(resizeCursor);
+                setCursor(MCursor::handCursor);
                 resizeBrush();
             }
             else if (newEvent.isModifierControl())
             {
                 intensitySwitch=true;
                 interactiveResize=false;
-                MCursor resizeCursor(MCursor::crossHairCursor);
-                setCursor(resizeCursor);
+                setCursor(MCursor::handCursor);
                 resetIntensity();
             }
             updateGuidLine();
@@ -220,7 +213,6 @@ void    brushContext::updateGuidLine()
     }
     glEnd();
 
-
     glBegin(GL_LINES);
     glVertex2f( cursorX-Radius*(float)intensity , (float)cursorY );
     glVertex2f( cursorX+Radius*(float)intensity , (float)cursorY );
@@ -232,7 +224,7 @@ void    brushContext::updateGuidLine()
 
     glEnd();
 
-    //glFlush();
+    glFlush();
 	glLineWidth(1.0);
 	glPopAttrib();
 
@@ -257,6 +249,7 @@ MStatus brushContext::getSelectedCurves(MDagPathArray &curvePathArray)
     if (MGlobal::getActiveSelectionList(list) == MS::kSuccess)
     {
         MItSelectionList iter(list, MFn::kNurbsCurve,&state);
+
         if (state == MS::kFailure)
         {
             return MS::kFailure;
@@ -284,7 +277,7 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
     if (curvePathArray.length() == 0)
         return MS::kFailure;
 
-	// calculate the motion of the cursor once out here.. 
+	// calculate the motion of the cursor once out here..
 	MPoint nearClipPt[2],farClipPt[2];
 
     //get the oldCursor position on the near clip of the camera
@@ -302,7 +295,15 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
     if (state == MS::kFailure)
         return state;
 
-    state=view.viewToWorld(view.portHeight(),view.portWidth(),maxNearViewPoint[1],maxFarViewPoint[1]);
+
+	double portSquareSize = view.portHeight();
+	// we want to base the mag off of a  square viewport
+	if (portSquareSize >= view.portWidth())
+	{
+		portSquareSize = view.portWidth();
+	}
+
+    state=view.viewToWorld(portSquareSize,portSquareSize,maxNearViewPoint[1],maxFarViewPoint[1]);
     if (state == MS::kFailure)
         return state;
 
@@ -311,9 +312,17 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
     dir3d=nearClipPt[1]-nearClipPt[0];
     dir3d.normalize();
 
+
+	// This helps  normalize the brush stroke depending on how large our clipping planes are...
+	MDagPath camPath;
+	view.getCamera(camPath);
+	MFnCamera cam(camPath);
+	double ncp = cam.nearClippingPlane();
     MVector dirNearPt(0,0,0);
     dirNearPt=maxNearViewPoint[1]-maxNearViewPoint[0];
-    double mag=dirNearPt.length();
+	double mag= dirNearPt.length()*(1/ncp);
+
+	cout << mag << endl;
 
 	map<unsigned int, MIntArray>::iterator  iter;
 	for (iter = cvLib.begin(); iter != cvLib.end(); iter++)
