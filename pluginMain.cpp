@@ -2,7 +2,7 @@
 #include <maya/MFnPlugin.h>
 #include "brushContext.h"
 #include "brushContextCommand.h"
-#include "brushTool.h"
+#include "brushToolCommand.h"
 
 MStatus initializePlugin( MObject obj )
 
@@ -13,8 +13,8 @@ MStatus initializePlugin( MObject obj )
     status = plugin.registerContextCommand("curveBrushContext",
                                            brushContextCommand::creator,
                                            "curveBrushToolCmd",
-                                           brushTool::creator,
-                                           brushTool::newSyntax
+                                           brushToolCommand::creator,
+                                           brushToolCommand::newSyntax
                                           );
     if (!status) {
         MGlobal::displayError("Error registering curveBrushContextCommand");

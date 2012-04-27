@@ -53,8 +53,6 @@ public:
     MStatus         doDrag( MEvent &newEvent );
     MStatus         doHold( MEvent &newEvent );
     MStatus         helpStateHasChanged( MEvent &newEvent );
-    void            abortAction ( );
-    void			deleteAction();
 
 
 private:
@@ -68,14 +66,16 @@ private:
     bool            intensitySwitch;
     double          intensity;
     bool			firstDraw;
+	int				brushMode;
 	std::map<unsigned int, MIntArray> cvsInCircle;
+
 
 public:
     void            updateGuidLine(void);
     MStatus         getSelectedCurves(MDagPathArray &curvePathArray);
     MStatus         checkCv(MDagPathArray PathArray,std::map<unsigned int,MIntArray> &cvLib );
     MStatus         updateCurve(MDagPathArray curvePathArray,std::map<unsigned int,MIntArray> cvLib);
-    MStatus         updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, int cvNum, double mag, MVector dir3d );
+    MStatus         updatePosition(MFnNurbsCurve &ptsCurve, int cvNum, double mag, MVector dir3d );
     MStatus         storePosition();
     MStatus         restorePosition();
 
@@ -86,6 +86,8 @@ public:
     float           getRadius(void);
     void            setLockBase(bool lock);
     bool            getLockBase(void);
+	void            setBrushMode(unsigned int mode);
+    int			    getBrushMode(void);
     void            setIntensity(double nIntensity);
     double          getIntensity(void);
     void            resetIntensity();

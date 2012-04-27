@@ -14,23 +14,25 @@ static const char *resizeBrushFlag = "-rsb";
 static const char *resizeBrushLongFlag = "-resizeBrush";
 static const char *intensityFlag = "-ity";
 static const char *intensityLongFlag = "-intensity";
+static const char *brushModeFlag = "-bm";
+static const char *brushModeLongFlag = "-brushMode";
 
 class brushContextCommand : public MPxContextCommand
 {
-	public:
-		                       brushContextCommand() {};
-		virtual  MPxContext  * makeObj();
-		virtual  MStatus	   appendSyntax();
+public:
+    brushContextCommand() {};
+    virtual  MPxContext  * makeObj();
+    virtual  MStatus	   appendSyntax();
 
-	public:
-		static void*           creator();
-		static MSyntax         newSyntax();
+public:
+    static void*           creator();
+    static MSyntax         newSyntax();
 
-		virtual	MStatus		   doEditFlags();
-	    virtual MStatus		   doQueryFlags(); 
+    virtual	MStatus		   doEditFlags();
+    virtual MStatus		   doQueryFlags();
 
-    protected:
-		brushContext*          nBrushContext;
+protected:
+    brushContext*          nBrushContext;
 };
 
 #endif

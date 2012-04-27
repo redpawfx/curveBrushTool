@@ -37,7 +37,7 @@ clean:
 
 SOURCES = 	brushContextCommand.cpp\
 		brushContext.cpp\
-		brushTool.cpp\
+		brushToolCommand.cpp\
 		pluginMain.cpp
 
 OBJS = $(SOURCES:.cpp=.o)
@@ -48,9 +48,9 @@ $(PLUGIN): $(OBJS)
 	-rm -f $(OUTPUT)$@
 	$(LD) -o $(OUTPUT)$@ $(OBJS) $(LIBS)
 
+install: $(all)
 
-
-
+	cp --dereference -rv scripts/*  /redpawFX/maya/mel/3rdParty/curveBrushTool
 
 
 

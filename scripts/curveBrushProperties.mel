@@ -16,22 +16,27 @@ global proc curveBrushProperties ()
 					columnLayout curveBrushOptions;
 						separator -style "none";
 
+						button -l "comb" brushMode1;
+						button -l "pull ends" brushMode2;
+						button -l "straighten" brushMode3;
+						button -l "resize" brushMode4;
+
 						intSliderGrp
 							-field 1
 							-label "Brush Size"
 							-minValue 10
 							-maxValue 400
-							-fieldMinValue 10 
-                                                -fieldMaxValue 400
+							-fieldMinValue 10
+							-fieldMaxValue 400
 							-value 100
 							radius;
-                                         floatSliderGrp
+						floatSliderGrp
 							-field 1
 							-label "Brush Intensity"
 							-minValue 0.0
 							-maxValue 2.0
-							-fieldMinValue 0.0 
-                                                -fieldMaxValue 2.0
+							-fieldMinValue 0.0
+							-fieldMaxValue 2.0
 							-value 0.5
 							intensity;
 						checkBoxGrp
@@ -71,5 +76,12 @@ global proc curveBrushSetCallbacks(string $parent)
  	checkBoxGrp -e
  		-on1 ("curveBrushContext -e -lb true `currentCtx`")
  		-of1 ("curveBrushContext -e -lb false `currentCtx`")
- 		lockBaseGrp;	
+ 		lockBaseGrp;
+
+	button -e -c ("curveBrushContext -e -bm 1 `currentCtx`") brushMode1;
+	button -e -c ("curveBrushContext -e -bm 2 `currentCtx`") brushMode2;
+	button -e -c ("curveBrushContext -e -bm 3 `currentCtx`") brushMode3;
+	button -e -c ("curveBrushContext -e -bm 4 `currentCtx`") brushMode4;
+
+
 }

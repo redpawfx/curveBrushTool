@@ -1,7 +1,7 @@
 
 #include "brushContextCommand.h"
 #include "brushContext.h"
-#include "brushTool.h"
+#include "brushToolCommand.h"
 
 using namespace std;
 
@@ -65,7 +65,7 @@ void    brushContext::toolOffCleanup()
 
 MStatus brushContext::doEnterRegion ( MEvent &newEvent)
 {
-	cout<< "doEnterRegion" << endl;
+
     if (MPxContext::doEnterRegion(newEvent) == MS::kSuccess)
     {
         MString str("Drag the tool around the curves");
@@ -192,54 +192,7 @@ MStatus brushContext::helpStateHasChanged(MEvent &newEvent)
     return state;
 }
 
-//using opengl to draw a guidline on the viewport's overlay plane
-void    brushContext::updateGuidLine()
-{
-    view =M3dView::active3dView();
-    int portW=view.portWidth();
-    int portH=view.portHeight();
 
-    view.beginXorDrawing();
-    glClear(GL_CURRENT_BIT);
-    glPushAttrib(GL_CURRENT_BIT );
-	glColor3f(0,1,1);
-    glLineWidth(1.5);
-    glBegin(GL_LINE_LOOP);
-    for (int i=0; i<360; i++)
-    {
-        float angle = PI/180*i;
-        glVertex2f( (Radius * cos(angle) +cursorX) ,
-                    (Radius * sin(angle) +(cursorY)) );
-    }
-    glEnd();
-
-    glBegin(GL_LINES);
-    glVertex2f( cursorX-Radius*(float)intensity , (float)cursorY );
-    glVertex2f( cursorX+Radius*(float)intensity , (float)cursorY );
-    glEnd();
-
-    glBegin(GL_LINES);
-    glVertex2f( cursorX , (cursorY)-Radius*(float)intensity );
-    glVertex2f( cursorX , (cursorY)+Radius*(float)intensity );
-
-    glEnd();
-
-    glFlush();
-	glLineWidth(1.0);
-	glPopAttrib();
-
-	/*
-#ifdef _WIN32
-    SwapBuffers( view.deviceContext() );
-#elif defined (OSMac_)
-    ::aglSwapBuffers( view.display());
-#else
-	glXSwapBuffers( view.display(), view.window() );
-#endif // _WIN32
-*/
-    view.endXorDrawing();
-    view.refresh(0,1,0);
-}
 
 //get selected curves and store them in curvePathArray
 MStatus brushContext::getSelectedCurves(MDagPathArray &curvePathArray)
@@ -268,6 +221,66 @@ MStatus brushContext::getSelectedCurves(MDagPathArray &curvePathArray)
     else
         return MS::kFailure;
 }
+
+//check which cv is in circle
+MStatus brushContext::checkCv(MDagPathArray PathArray,std::map<unsigned int,MIntArray> &cvsInCircle)
+{
+    unsigned int i=0;
+    MStatus  state=MS::kSuccess;
+
+	cvsInCircle.clear();
+
+    for (;i<PathArray.length();i++)
+    {
+		MIntArray perCurve;
+		cvsInCircle.insert(pair<unsigned int, MIntArray> (i,perCurve));
+
+        MFnNurbsCurve nurbsCurve(PathArray[i],&state);
+
+        MFnDagNode dagNode(PathArray[i]);
+        MString    dagName=dagNode.partialPathName();
+
+        if ( state == MS::kFailure )
+            return state;
+
+        MPointArray pts;
+        nurbsCurve.getCVs(pts,MSpace::kWorld);
+        if ( state == MS::kFailure )
+            return state;
+
+        unsigned int j;
+        if (!lockBase)
+            j=0;
+        else
+            j=1;
+
+		if (brushMode == 2) // pull ends
+		{
+			j = pts.length()-1;
+		}
+
+        for (;j<pts.length();j++)
+        {
+            short int xPos=0,yPos=0;
+
+            view.worldToView(pts[j],xPos,yPos,&state);
+            //yPos=view.portHeight()-yPos;
+
+            if ( state == MS::kFailure )
+                return state;
+
+            float distanceToCursor=sqrt( (float) (xPos-oldCursorX)*(xPos-oldCursorX)+(yPos-oldCursorY)*(yPos-oldCursorY) );
+            if ( distanceToCursor < Radius )
+            {
+                state=cvsInCircle[i].append(j);
+                if ( state == MS::kFailure )
+                    return state;
+            }
+        }
+    }
+    return state;
+}
+
 
 MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned int, MIntArray>cvLib)
 {
@@ -322,8 +335,6 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
     dirNearPt=maxNearViewPoint[1]-maxNearViewPoint[0];
 	double mag= dirNearPt.length()*(1/ncp);
 
-	cout << mag << endl;
-
 	map<unsigned int, MIntArray>::iterator  iter;
 	for (iter = cvLib.begin(); iter != cvLib.end(); iter++)
 	{
@@ -333,9 +344,7 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
 		unsigned int j = 0;
 		for (;j<iter->second.length();j++)
 		{
-			MString curveName = curvePathArray[iter->first].fullPathName();
-
-			state=updatePosition(curveName,brushCurve,iter->second[j], mag, dir3d);
+			state=updatePosition(brushCurve,iter->second[j], mag, dir3d);
 			if (state == MS::kFailure)
 				return state;
 		}
@@ -348,7 +357,7 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
 }
 
 //get the single curve and its single cv then move it
-MStatus brushContext::updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, int cvNum, double mag, MVector dir3d )
+MStatus brushContext::updatePosition(MFnNurbsCurve &ptsCurve, int cvNum, double mag, MVector dir3d )
 {
     MStatus      state=MS::kSuccess;
     MPoint       pt;
@@ -365,59 +374,64 @@ MStatus brushContext::updatePosition(MString curveName,MFnNurbsCurve &ptsCurve, 
     return state;
 }
 
-//check which cv is in circle
-MStatus brushContext::checkCv(MDagPathArray PathArray,std::map<unsigned int,MIntArray> &cvsInCircle)
+
+
+//using opengl to draw a guidline on the viewport's overlay plane
+void    brushContext::updateGuidLine()
 {
-    unsigned int i=0;
-    MStatus      state=MS::kSuccess;
+    view =M3dView::active3dView();
+    int portW=view.portWidth();
+    int portH=view.portHeight();
 
-	cvsInCircle.clear();
-
-    for (;i<PathArray.length();i++)
+    view.beginXorDrawing();
+    glClear(GL_CURRENT_BIT);
+    glPushAttrib(GL_CURRENT_BIT );
+	glColor3f(0,1,1);
+    glLineWidth(1.5);
+    glBegin(GL_LINE_LOOP);
+    for (int i=0; i<360; i++)
     {
-		MIntArray perCurve;
-		cvsInCircle.insert(pair<unsigned int, MIntArray> (i,perCurve));
-
-        MFnNurbsCurve nurbsCurve(PathArray[i],&state);
-
-        MFnDagNode dagNode(PathArray[i]);
-        MString    dagName=dagNode.partialPathName();
-
-        if ( state == MS::kFailure )
-            return state;
-
-        MPointArray pts;
-        nurbsCurve.getCVs(pts,MSpace::kWorld);
-        if ( state == MS::kFailure )
-            return state;
-
-        unsigned int j;
-        if (!lockBase)
-            j=0;
-        else
-            j=1;
-
-        for (;j<pts.length();j++)
-        {
-            short int xPos=0,yPos=0;
-
-            view.worldToView(pts[j],xPos,yPos,&state);
-            //yPos=view.portHeight()-yPos;
-
-            if ( state == MS::kFailure )
-                return state;
-
-            float distanceToCursor=sqrt( (float) (xPos-oldCursorX)*(xPos-oldCursorX)+(yPos-oldCursorY)*(yPos-oldCursorY) );
-            if ( distanceToCursor < Radius )
-            {
-                state=cvsInCircle[i].append(j);
-                if ( state == MS::kFailure )
-                    return state;
-            }
-        }
+        float angle = PI/180*i;
+        glVertex2f( (Radius * cos(angle) +cursorX) ,
+                    (Radius * sin(angle) +(cursorY)) );
     }
-    return state;
+    glEnd();
+
+    glBegin(GL_LINES);
+    glVertex2f( cursorX-Radius*(float)intensity , (float)cursorY );
+    glVertex2f( cursorX+Radius*(float)intensity , (float)cursorY );
+    glEnd();
+
+    glBegin(GL_LINES);
+    glVertex2f( cursorX , (cursorY)-Radius*(float)intensity );
+    glVertex2f( cursorX , (cursorY)+Radius*(float)intensity );
+
+    glEnd();
+
+    glFlush();
+	glLineWidth(1.0);
+	glPopAttrib();
+
+	/*
+#ifdef _WIN32
+    SwapBuffers( view.deviceContext() );
+#elif defined (OSMac_)
+    ::aglSwapBuffers( view.display());
+#else
+	glXSwapBuffers( view.display(), view.window() );
+#endif // _WIN32
+*/
+    view.endXorDrawing();
+    view.refresh(0,1,0);
 }
+
+
+///////////////////////////////////////////////////
+/// CONTEXT ATTRIBUTE HANDLING
+
+///////////////////////////////////////////////////
+/// BRUSH SIZE
+
 //resize the brush size
 void    brushContext::resizeBrush(void)
 {
@@ -459,10 +473,13 @@ float   brushContext::getRadius()
     return Radius;
 }
 
+/////////////////////////////////////////////////////////////
+/// LOCKBASE
+
 //set lockbase mode
 void    brushContext::setLockBase(bool lock)
 {
-    lockBase=lock;
+    lockBase = lock;
 }
 //get lockbase mode
 bool    brushContext::getLockBase()
@@ -470,6 +487,23 @@ bool    brushContext::getLockBase()
     return lockBase;
 }
 
+//////////////////////////////////////////////////////////////
+/// BRUSH MODE
+
+// set brush mode
+void brushContext::setBrushMode(unsigned int mode)
+{
+	brushMode = mode;
+}
+
+// get brush mode
+int brushContext::getBrushMode()
+{
+	return brushMode;
+}
+
+/////////////////////////////////////////////////////////
+/// INTENSITY
 void    brushContext::setIntensity(double nIntensity)
 {
     intensity=nIntensity;
@@ -484,9 +518,7 @@ void    brushContext::resetIntensity()
     else if (intensity>2.0)
         intensity=2.0;
 
-
     oldCursorX=cursorX;
-
 
     MString command = "curveBrushContext -e -ity ";
     command = command + intensity +" `currentCtx`";
@@ -500,15 +532,9 @@ double  brushContext::getIntensity(void)
 {
     return intensity;
 }
+
 void    brushContext::getClassName( MString & name ) const
 {
     name.set("curveBrush");
 }
 
-void brushContext::abortAction()
-{
-}
-
-void brushContext::deleteAction()
-{
-}
