@@ -15,6 +15,9 @@ brushContext::brushContext()
     intensitySwitch=false;
     intensity=0.5;
     cvsInCircle.clear();
+	brushMode = 1;
+	brushMag = 1.0f;
+	dir3d = MVector(0,0,0);
 
     MString str("Curve Brush Manipulator");
     setTitleString(str);
@@ -85,8 +88,8 @@ MStatus brushContext::doEnterRegion ( MEvent &newEvent)
 MStatus brushContext::doPress(MEvent &newEvent)
 {
 
-    if (MPxContext::doPress(newEvent) == MS::kSuccess)
-    {
+    //if (MPxContext::doPress(newEvent) == MS::kSuccess)
+    //{
 		firstDraw = true;
 		if (newEvent.getPosition(cursorX,cursorY) == MS::kSuccess)
 		{
@@ -104,22 +107,36 @@ MStatus brushContext::doPress(MEvent &newEvent)
         }
         else
             return MS::kFailure;
-    }
-    else
-        return MS::kFailure;
+    //}
+    //else
+    //    return MS::kFailure;
 }
 
 
 MStatus brushContext::doRelease(MEvent &newEvent)
 {
-    MStatus state=MPxContext::doRelease(newEvent);
+	cout << "doRelease" << endl;
+    //MStatus status=MPxContext::doRelease(newEvent);
+
+	MStatus status;
 
     setCursor(MCursor::pencilCursor);
 	updateGuidLine();
 
     MString command = "undoInfo -closeChunk";
     MGlobal::executeCommand(command);
-    return state;
+
+	/*
+	for (unsigned int i = 0; i<dagPathArray.length(); i++)
+	{
+		MFnNurbsCurve brushCurve(dagPathArray[i],&status);
+		brushCurve.updateCurve();
+		MPlug lockLengthPlug = brushCurve.findPlug("lockLength");
+		lockLengthPlug.setValue(true);
+	}
+	*/
+
+    return MStatus::kSuccess;
 }
 MStatus brushContext::doHold(MEvent &newEvent)
 {
@@ -188,8 +205,8 @@ MStatus brushContext::doDrag(MEvent &newEvent)
 
 MStatus brushContext::helpStateHasChanged(MEvent &newEvent)
 {
-    MStatus state=MPxContext::helpStateHasChanged(newEvent);
-    return state;
+    MStatus status=MPxContext::helpStateHasChanged(newEvent);
+    return status;
 }
 
 
@@ -198,15 +215,13 @@ MStatus brushContext::helpStateHasChanged(MEvent &newEvent)
 MStatus brushContext::getSelectedCurves(MDagPathArray &curvePathArray)
 {
     MSelectionList list;
-    MStatus state;
+    MStatus status;
     if (MGlobal::getActiveSelectionList(list) == MS::kSuccess)
     {
-        MItSelectionList iter(list, MFn::kNurbsCurve,&state);
+        MItSelectionList iter(list, MFn::kNurbsCurve,&status);
 
-        if (state == MS::kFailure)
-        {
-            return MS::kFailure;
-        }
+		CHECK_MSTATUS(status);
+
         for ( ; !iter.isDone(); iter.next() )
         {
             MDagPath item;
@@ -226,27 +241,24 @@ MStatus brushContext::getSelectedCurves(MDagPathArray &curvePathArray)
 MStatus brushContext::checkCv(MDagPathArray PathArray,std::map<unsigned int,MIntArray> &cvsInCircle)
 {
     unsigned int i=0;
-    MStatus  state=MS::kSuccess;
+    MStatus  status=MS::kSuccess;
 
 	cvsInCircle.clear();
 
     for (;i<PathArray.length();i++)
     {
 		MIntArray perCurve;
-		cvsInCircle.insert(pair<unsigned int, MIntArray> (i,perCurve));
 
-        MFnNurbsCurve nurbsCurve(PathArray[i],&state);
+        MFnNurbsCurve nurbsCurve(PathArray[i],&status);
 
         MFnDagNode dagNode(PathArray[i]);
         MString    dagName=dagNode.partialPathName();
 
-        if ( state == MS::kFailure )
-            return state;
+		CHECK_MSTATUS(status);
 
         MPointArray pts;
         nurbsCurve.getCVs(pts,MSpace::kWorld);
-        if ( state == MS::kFailure )
-            return state;
+		CHECK_MSTATUS(status);
 
         unsigned int j;
         if (!lockBase)
@@ -261,31 +273,42 @@ MStatus brushContext::checkCv(MDagPathArray PathArray,std::map<unsigned int,MInt
 
         for (;j<pts.length();j++)
         {
-            short int xPos=0,yPos=0;
+				short int xPos=0,yPos=0;
 
-            view.worldToView(pts[j],xPos,yPos,&state);
-            //yPos=view.portHeight()-yPos;
+				view.worldToView(pts[j],xPos,yPos,&status);
 
-            if ( state == MS::kFailure )
-                return state;
+				CHECK_MSTATUS(status);
 
-            float distanceToCursor=sqrt( (float) (xPos-oldCursorX)*(xPos-oldCursorX)+(yPos-oldCursorY)*(yPos-oldCursorY) );
-            if ( distanceToCursor < Radius )
-            {
-                state=cvsInCircle[i].append(j);
-                if ( state == MS::kFailure )
-                    return state;
-            }
+				float distanceToCursor=sqrt( (float) (xPos-oldCursorX)*(xPos-oldCursorX)+(yPos-oldCursorY)*(yPos-oldCursorY) );
+				if ( distanceToCursor < Radius)
+				{
+					if (brushMode == 3 || brushMode == 4)  // straighten or  scale whole curve
+					{
+						j=1;
+						for (;j<pts.length();j++)
+						{
+							status=perCurve.append(j);
+							CHECK_MSTATUS(status);
+						}
+						break;
+					}
+					status=perCurve.append(j);
+					CHECK_MSTATUS(status);
+				}
         }
+        if(perCurve.length())
+		{
+			cvsInCircle.insert(pair<unsigned int, MIntArray> (i,perCurve));
+		}
     }
-    return state;
+    return status;
 }
 
 
-MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned int, MIntArray>cvLib)
+MStatus brushContext::updateCurve(MDagPathArray &curvePathArray,std::map<unsigned int, MIntArray> &cvLib)
 {
 
-    MStatus    state=MS::kSuccess;
+    MStatus    status=MS::kSuccess;
 
     if (curvePathArray.length() == 0)
         return MS::kFailure;
@@ -294,20 +317,18 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
 	MPoint nearClipPt[2],farClipPt[2];
 
     //get the oldCursor position on the near clip of the camera
-    state=view.viewToWorld(oldCursorX,(oldCursorY),nearClipPt[0],farClipPt[0]);
-    if (state == MS::kFailure)
-        return state;
+    status=view.viewToWorld(oldCursorX,(oldCursorY),nearClipPt[0],farClipPt[0]);
+	CHECK_MSTATUS(status);
+
 
     //get the cursor position on the near clip of the camera
-    state=view.viewToWorld(cursorX,(cursorY),nearClipPt[1],farClipPt[1]);
-    if (state == MS::kFailure)
-        return state;
+    status=view.viewToWorld(cursorX,(cursorY),nearClipPt[1],farClipPt[1]);
+	CHECK_MSTATUS(status);
+
 
     MPoint maxNearViewPoint[2],maxFarViewPoint[2];
-    state=view.viewToWorld(0,0,maxNearViewPoint[0],maxFarViewPoint[0]);
-    if (state == MS::kFailure)
-        return state;
-
+    status=view.viewToWorld(0,0,maxNearViewPoint[0],maxFarViewPoint[0]);
+	CHECK_MSTATUS(status);
 
 	double portSquareSize = view.portHeight();
 	// we want to base the mag off of a  square viewport
@@ -316,15 +337,12 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
 		portSquareSize = view.portWidth();
 	}
 
-    state=view.viewToWorld(portSquareSize,portSquareSize,maxNearViewPoint[1],maxFarViewPoint[1]);
-    if (state == MS::kFailure)
-        return state;
+    status=view.viewToWorld(portSquareSize,portSquareSize,maxNearViewPoint[1],maxFarViewPoint[1]);
+	CHECK_MSTATUS(status);
 
     //get the movement direction of the cursor on the near clip
-    MVector   dir3d(0,0,0);
     dir3d=nearClipPt[1]-nearClipPt[0];
     dir3d.normalize();
-
 
 	// This helps  normalize the brush stroke depending on how large our clipping planes are...
 	MDagPath camPath;
@@ -333,45 +351,148 @@ MStatus brushContext::updateCurve(MDagPathArray curvePathArray,std::map<unsigned
 	double ncp = cam.nearClippingPlane();
     MVector dirNearPt(0,0,0);
     dirNearPt=maxNearViewPoint[1]-maxNearViewPoint[0];
-	double mag= dirNearPt.length()*(1/ncp);
+	brushMag = dirNearPt.length()*(1/ncp);
 
+
+	switch(brushMode)
+	{
+		case 1: // comb
+			status =comb(curvePathArray,cvLib);
+			break;
+		case 2: // pull ends
+			status = pullEnds(curvePathArray,cvLib);
+			break;
+		case 3: // straighten
+			status = straighten(curvePathArray,cvLib);
+			break;
+		case 4: // scale hair curve
+			status = scaleCurve(curvePathArray,cvLib);
+			break;
+		default:
+			status =comb(curvePathArray,cvLib);
+			break;
+	}
+
+    return status;
+}
+
+// standard comb operation
+MStatus brushContext::comb(MDagPathArray &curvePathArray,std::map<unsigned int, MIntArray> &cvLib)
+{
+	MStatus status;
 	map<unsigned int, MIntArray>::iterator  iter;
 	for (iter = cvLib.begin(); iter != cvLib.end(); iter++)
 	{
-		MFnNurbsCurve brushCurve(curvePathArray[iter->first],&state);
-		if ( state == MS::kFailure )
-			return state;
+		MFnNurbsCurve brushCurve(curvePathArray[iter->first],&status);
+		CHECK_MSTATUS(status);
+
 		unsigned int j = 0;
 		for (;j<iter->second.length();j++)
 		{
-			state=updatePosition(brushCurve,iter->second[j], mag, dir3d);
-			if (state == MS::kFailure)
-				return state;
-		}
-		state=brushCurve.updateCurve();
-		if (state == MS::kFailure)
-			return state;
-	}
+			status=updatePosition(brushCurve,iter->second[j], brushMag, dir3d);
+			CHECK_MSTATUS(status);
 
-    return state;
+		}
+		status=brushCurve.updateCurve();
+		CHECK_MSTATUS(status);
+
+	}
+	return status;
 }
+
+// pull ends uses standard comb operation but only on the end CV's (chosen earlier in the process)
+MStatus brushContext::pullEnds(MDagPathArray &curvePathArray,std::map<unsigned int,MIntArray> &cvLib)
+{
+	MStatus status;
+	status = comb(curvePathArray,cvLib);
+	CHECK_MSTATUS(status);
+	return status;
+
+}
+MStatus brushContext::straighten(MDagPathArray &curvePathArray,std::map<unsigned int,MIntArray> &cvLib)
+{
+	MStatus status;
+	map<unsigned int, MIntArray>::iterator  iter;
+	for (iter = cvLib.begin(); iter != cvLib.end(); iter++)
+	{
+		MFnNurbsCurve brushCurve(curvePathArray[iter->first],&status);
+		CHECK_MSTATUS(status);
+
+		MPointArray curveCVs;
+		brushCurve.getCVs(curveCVs,MSpace::kWorld);
+		unsigned int j = 0;
+		for (;j< iter->second.length();j++)
+		{
+			MPoint first,second,third,midPoint;
+			first = curveCVs[iter->second[j]-1];
+			second = curveCVs[iter->second[j]];
+			if( j == iter->second.length()-1) // end point treated special
+			{
+				third = second + ((curveCVs[0]-second)/curveCVs.length());
+			}
+			else
+			{
+				third = curveCVs[iter->second[j]+1];
+			}
+
+			midPoint = first+((third-first)/2);
+			dir3d = second - midPoint;
+			dir3d *= brushMag*intensity;
+			brushCurve.setCV(iter->second[j],second+dir3d, MSpace::kWorld);
+		}
+		status=brushCurve.updateCurve();
+	}
+	return status;
+}
+MStatus brushContext::scaleCurve(MDagPathArray &curvePathArray,std::map<unsigned int,MIntArray> &cvLib)
+{
+	MStatus status;
+	map<unsigned int, MIntArray>::iterator  iter;
+	for (iter = cvLib.begin(); iter != cvLib.end(); iter++)
+	{
+		MFnNurbsCurve brushCurve(curvePathArray[iter->first],&status);
+		CHECK_MSTATUS(status);
+
+		///TODO: need to figure out how to do this properly..
+		//MPlug lockLengthPlug = brushCurve.findPlug("lockLength");
+		//lockLengthPlug.setValue(false);
+
+		unsigned int j = 0;
+		for (;j<iter->second.length();j++)
+		{
+			MPoint rootCv;
+			brushCurve.getCV(0,rootCv,MSpace::kObject);
+			MPoint move;
+			brushCurve.getCV(iter->second[j],move,MSpace::kObject);
+			move -= rootCv;
+			dir3d = move;
+			dir3d *= 1.f+ brushMag*intensity*0.1;
+			brushCurve.setCV(iter->second[j],rootCv+ dir3d, MSpace::kObject);
+		}
+		status=brushCurve.updateCurve();
+		CHECK_MSTATUS(status);
+
+	}
+	return status;
+}
+
 
 //get the single curve and its single cv then move it
 MStatus brushContext::updatePosition(MFnNurbsCurve &ptsCurve, int cvNum, double mag, MVector dir3d )
 {
-    MStatus      state=MS::kSuccess;
+    MStatus      status=MS::kSuccess;
     MPoint       pt;
 
     //get the position of cvNum and put it into pt
-    state=ptsCurve.getCV(cvNum,pt,MSpace::kWorld);
-    if (state == MS::kFailure)
-        return state;
+    status=ptsCurve.getCV(cvNum,pt,MSpace::kWorld);
+	CHECK_MSTATUS(status);
+
 
 	pt+=intensity*mag*dir3d;
 
-	state=ptsCurve.setCV(cvNum,pt,MSpace::kWorld);
+	status=ptsCurve.setCV(cvNum,pt,MSpace::kWorld);
 
-    return state;
+    return status;
 }
 
 

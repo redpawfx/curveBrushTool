@@ -5,6 +5,7 @@
 #include <maya/MToolsInfo.h>
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
+#include <maya/MPlug.h>
 #include <maya/MEvent.h>
 #include <maya/MString.h>
 #include <maya/MEvent.h>
@@ -68,16 +69,22 @@ private:
     bool			firstDraw;
 	int				brushMode;
 	std::map<unsigned int, MIntArray> cvsInCircle;
-
+	float 			brushMag;
+	MVector   		dir3d;
 
 public:
     void            updateGuidLine(void);
     MStatus         getSelectedCurves(MDagPathArray &curvePathArray);
     MStatus         checkCv(MDagPathArray PathArray,std::map<unsigned int,MIntArray> &cvLib );
-    MStatus         updateCurve(MDagPathArray curvePathArray,std::map<unsigned int,MIntArray> cvLib);
+    MStatus         updateCurve(MDagPathArray &curvePathArray,std::map<unsigned int,MIntArray> &cvLib);
     MStatus         updatePosition(MFnNurbsCurve &ptsCurve, int cvNum, double mag, MVector dir3d );
     MStatus         storePosition();
     MStatus         restorePosition();
+	MStatus			comb(MDagPathArray &curvePathArray,std::map<unsigned int,MIntArray> &cvLib);
+	MStatus			pullEnds(MDagPathArray &curvePathArray,std::map<unsigned int,MIntArray> &cvLib);
+	MStatus			straighten(MDagPathArray &curvePathArray,std::map<unsigned int,MIntArray> &cvLib);
+	MStatus         scaleCurve(MDagPathArray &curvePathArray,std::map<unsigned int,MIntArray> &cvLib);
+	// add more brush functions here
 
     void            resizeBrush();
     void            setInteractive(bool interactive);
