@@ -28,8 +28,8 @@
 	#include <WindowsX.h>
 	#include <windows.h>
 	#include <gl/GLU.h>
-#elseif defined(OSMac_MachO_)
-	#include <OpenGL/gl.h>
+#elif OSMac_MachO
+ 	#include <OpenGL/gl.h>
 	#include <OpenGL/glu.h>
 #else
 	#include <GL/glu.h>
